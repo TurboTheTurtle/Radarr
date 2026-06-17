@@ -152,6 +152,37 @@ namespace NzbDrone.Mono.Test.DiskProviderTests
                 });
         }
 
+        private void GivenProcMounts(params IMount[] mounts)
+        {
+            Mocker.GetMock<ISymbolicLinkResolver>()
+                .Setup(v => v.GetCompleteRealPath(It.IsAny<string>()))
+                .Returns<string>(s => s);
+
+            Mocker.GetMock<IProcMountProvider>()
+                .Setup(v => v.GetMounts())
+                .Returns(mounts.ToList());
+        }
+
+        private static IMount GivenHealthyMount(string rootDir)
+        {
+            var mount = new Mock<IMount>();
+            mount.SetupGet(v => v.Name).Returns(rootDir);
+            mount.SetupGet(v => v.RootDirectory).Returns(rootDir);
+            mount.SetupGet(v => v.DriveType).Returns(DriveType.Fixed);
+
+            return mount.Object;
+        }
+
+        private static IMount GivenBrokenMount()
+        {
+            var mount = new Mock<IMount>();
+            mount.SetupGet(v => v.Name).Returns("/sshfs/stale");
+            mount.SetupGet(v => v.RootDirectory).Throws(new IOException("Transport endpoint is not connected"));
+            mount.SetupGet(v => v.DriveType).Returns(DriveType.Network);
+
+            return mount.Object;
+        }
+
         [TestCase("/snap/blaat")]
         [TestCase("/var/lib/docker/zfs-storage-mount")]
         public void should_ignore_special_mounts(string rootDir)
@@ -170,6 +201,31 @@ namespace NzbDrone.Mono.Test.DiskProviderTests
             GivenSpecialMount(rootDir);
 
             var mount = Subject.GetMount(Path.Combine(rootDir, "dir/somefile.mkv"));
+
+            mount.Should().NotBeNull();
+            mount.RootDirectory.Should().Be(rootDir);
+        }
+
+        [Test]
+        public void should_ignore_mounts_with_unreadable_root_directory()
+        {
+            var rootDir = "/mnt/radarr-healthy";
+
+            GivenProcMounts(GivenBrokenMount(), GivenHealthyMount(rootDir));
+
+            var mounts = Subject.GetMounts();
+
+            mounts.Select(d => d.RootDirectory).Should().Contain(rootDir);
+        }
+
+        [Test]
+        public void should_return_mount_when_another_mount_has_unreadable_root_directory()
+        {
+            var rootDir = "/mnt/radarr-healthy";
+
+            GivenProcMounts(GivenBrokenMount(), GivenHealthyMount(rootDir));
+
+            var mount = Subject.GetMount(Path.Combine(rootDir, "movie.mkv"));
 
             mount.Should().NotBeNull();
             mount.RootDirectory.Should().Be(rootDir);

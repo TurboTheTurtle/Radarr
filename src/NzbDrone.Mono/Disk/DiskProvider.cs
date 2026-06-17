@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using Mono.Unix;
 using Mono.Unix.Native;
 using NLog;
@@ -181,29 +180,103 @@ namespace NzbDrone.Mono.Disk
 
             try
             {
-                mounts.AddRange(GetDriveInfoMounts()
-                    .Select(d =>
-                    {
-                        try
-                        {
-                            return new DriveInfoMount(d, FindDriveType.Find(d.DriveFormat));
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.Debug(ex, "Failed to fetch drive info for mount point: {0}", d.Name);
+                foreach (var driveInfo in GetDriveInfoMounts())
+                {
+                    var mount = GetDriveInfoMount(driveInfo);
 
-                            return null;
-                        }
-                    })
-                    .Where(d => d is { DriveType: DriveType.Fixed or DriveType.Network or DriveType.Removable }));
+                    if (mount != null)
+                    {
+                        mounts.Add(mount);
+                    }
+                }
             }
             catch (Exception e)
             {
                 _logger.Warn(e, $"Unable to get drive mounts: {e.Message}");
             }
 
-            return mounts.DistinctBy(v => v.RootDirectory)
-                         .ToList();
+            return GetDistinctMounts(mounts);
+        }
+
+        private IMount GetDriveInfoMount(DriveInfo driveInfo)
+        {
+            try
+            {
+                var mount = new DriveInfoMount(driveInfo, FindDriveType.Find(driveInfo.DriveFormat));
+
+                if (mount.DriveType is DriveType.Fixed or DriveType.Network or DriveType.Removable)
+                {
+                    return mount;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Failed to fetch drive info for mount point: {0}", GetDriveName(driveInfo));
+            }
+
+            return null;
+        }
+
+        private List<IMount> GetDistinctMounts(List<IMount> mounts)
+        {
+            var distinctMounts = new List<IMount>();
+            var rootDirectories = new HashSet<string>();
+
+            foreach (var mount in mounts)
+            {
+                if (TryGetRootDirectory(mount, out var rootDirectory) && rootDirectories.Add(rootDirectory))
+                {
+                    distinctMounts.Add(mount);
+                }
+            }
+
+            return distinctMounts;
+        }
+
+        private bool TryGetRootDirectory(IMount mount, out string rootDirectory)
+        {
+            try
+            {
+                rootDirectory = mount.RootDirectory;
+
+                if (rootDirectory.IsNullOrWhiteSpace())
+                {
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Failed to fetch drive info for mount point: {0}", GetMountName(mount));
+
+                rootDirectory = null;
+                return false;
+            }
+        }
+
+        private string GetDriveName(DriveInfo driveInfo)
+        {
+            try
+            {
+                return driveInfo.Name;
+            }
+            catch
+            {
+                return "unknown";
+            }
+        }
+
+        private string GetMountName(IMount mount)
+        {
+            try
+            {
+                return mount.Name;
+            }
+            catch
+            {
+                return "unknown";
+            }
         }
 
         protected override bool IsSpecialMount(IMount mount)

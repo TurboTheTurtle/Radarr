@@ -541,9 +541,47 @@ namespace NzbDrone.Common.Disk
 
         protected List<DriveInfo> GetDriveInfoMounts()
         {
-            return DriveInfo.GetDrives()
-                            .Where(d => d.IsReady)
-                            .ToList();
+            var mounts = new List<DriveInfo>();
+            DriveInfo[] drives;
+
+            try
+            {
+                drives = DriveInfo.GetDrives();
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug(ex, "Failed to retrieve drive information");
+                return mounts;
+            }
+
+            foreach (var drive in drives)
+            {
+                try
+                {
+                    if (drive.IsReady)
+                    {
+                        mounts.Add(drive);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug(ex, "Failed to fetch drive info for mount point: {0}", GetDriveName(drive));
+                }
+            }
+
+            return mounts;
+        }
+
+        private static string GetDriveName(DriveInfo drive)
+        {
+            try
+            {
+                return drive.Name;
+            }
+            catch
+            {
+                return "unknown";
+            }
         }
 
         public List<DirectoryInfo> GetDirectoryInfos(string path)
