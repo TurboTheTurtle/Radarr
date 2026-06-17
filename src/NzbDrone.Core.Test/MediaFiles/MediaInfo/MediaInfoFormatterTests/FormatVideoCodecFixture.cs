@@ -78,5 +78,25 @@ namespace NzbDrone.Core.Test.MediaFiles.MediaInfo.MediaInfoFormatterTests
 
             MediaInfoFormatter.FormatVideoCodec(mediaInfoModel, null).Should().Be(mediaInfoModel.VideoFormat);
         }
+
+        [TestCase("h264, x264", "h264")]
+        [TestCase("hevc, x265", "hevc")]
+        [TestCase("mpeg2video, ", "mpeg2video")]
+        [TestCase("mpeg4, XVID", "mpeg4")]
+        [TestCase("vc1, WVC1", "vc1")]
+        [TestCase("av1, ", "av1")]
+        [TestCase("vp9, V_VP9", "vp9")]
+        [TestCase("wmv3, WMV3", "wmv3")]
+        public void should_format_video_codec_for_kodi_metadata(string videoFormatPack, string expectedFormat)
+        {
+            var split = videoFormatPack.Split(new string[] { ", " }, System.StringSplitOptions.None);
+            var mediaInfoModel = new MediaInfoModel
+            {
+                VideoFormat = split[0],
+                VideoCodecID = split[1]
+            };
+
+            MediaInfoFormatter.FormatVideoCodecForKodiMetadata(mediaInfoModel).Should().Be(expectedFormat);
+        }
     }
 }

@@ -59,5 +59,39 @@ namespace NzbDrone.Core.Test.MediaFiles.MediaInfo.MediaInfoFormatterTests
 
             MediaInfoFormatter.FormatAudioCodec(mediaInfoModel, sceneName).Should().Be(mediaInfoModel.AudioFormat);
         }
+
+        [TestCase("truehd, ,  ", "truehd")]
+        [TestCase("truehd, thd+,  ", "truehd_atmos")]
+        [TestCase("truehd, , Dolby TrueHD + Dolby Atmos", "truehd_atmos")]
+        [TestCase("eac3, ,  ", "eac3")]
+        [TestCase("eac3, ec+3,  ", "eac3_ddp_atmos")]
+        [TestCase("eac3, , Dolby Digital Plus + Dolby Atmos", "eac3_ddp_atmos")]
+        [TestCase("dts, , DTS", "dts")]
+        [TestCase("dts, , DTS-HD MA", "dtshd_ma")]
+        [TestCase("dts, , DTS:X", "dtshd_ma_x")]
+        [TestCase("dts, , DTS:X IMAX", "dtshd_ma_x_imax")]
+        [TestCase("dts, , DTS-HD HRA", "dtshd_hra")]
+        [TestCase("aac, , LC", "aac_lc")]
+        [TestCase("aac, A_AAC/MPEG4/LC/SBR,  ", "he_aac")]
+        [TestCase("aac, , HE-AACv2", "he_aac_v2")]
+        [TestCase("aac, , SSR", "aac_ssr")]
+        [TestCase("aac, , LTP", "aac_ltp")]
+        [TestCase("ac3, ,  ", "ac3")]
+        [TestCase("flac, ,  ", "flac")]
+        [TestCase("mp3, ,  ", "mp3")]
+        [TestCase("pcm_s16le, ,  ", "pcm_s16le")]
+        [TestCase("wmav2, ,  ", "wmav2")]
+        public void should_format_audio_codec_for_kodi_metadata(string audioFormatPack, string expectedFormat)
+        {
+            var split = audioFormatPack.Split(new string[] { ", " }, System.StringSplitOptions.None);
+            var mediaInfoModel = new MediaInfoModel
+            {
+                AudioFormat = split[0],
+                AudioCodecID = split[1],
+                AudioProfile = split[2]
+            };
+
+            MediaInfoFormatter.FormatAudioCodecForKodiMetadata(mediaInfoModel).Should().Be(expectedFormat);
+        }
     }
 }
